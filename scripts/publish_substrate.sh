@@ -75,24 +75,31 @@ log "idempotency check: identical tree ($TREE1)"
 # --------------------------------------------------------------------------- #
 # 4. Leak guardrail
 # --------------------------------------------------------------------------- #
-# After excluding rebrand.py + allowlisted backward-compat files, no tracked
-# TEXT file may contain `omnigent` or `substrate-ai`. Binary files are ignored
-# by `git grep -I`.
+# After excluding the pipeline tooling (stripped before publish) and the
+# allowlisted backward-compat files, no tracked TEXT file may contain
+# `omnigent` or `substrate-ai`. Binary files are ignored by `git grep -I`.
+# The tooling exclusions mirror scripts/publish_exclude.txt + rebrand SKIP set.
 LEAK="$(git grep -I -in -e omnigent -e substrate-ai -- \
   ':!scripts/rebrand.py' \
+  ':!scripts/sync_upstream.sh' \
+  ':!scripts/publish_substrate.sh' \
   ':!scripts/publish_exclude.txt' \
+  ':!.github/workflows/publish-substrate.yml' \
   ':!substrate/_env_compat.py' \
   ':!substrate/cli.py' || true)"
 if [ -n "$LEAK" ]; then
   printf '%s\n' "$LEAK" >&2
   fail "leak check: forbidden token in published text files"
 fi
-log "leak check: clean (allowlist: _env_compat.py, cli.py, binary assets)"
+log "leak check: clean (allowlist: _env_compat.py, cli.py, pipeline tooling, binary assets)"
 
-# Sanity: the allowlisted files must still contain ONLY legacy compat refs.
-git grep -I -in "omnigent" -- substrate/_env_compat.py substrate/cli.py \
-  | grep -viE "OMNIGENT_|OMNIGENTS_|OMNIAGENTS_|\.omnigent|\.omnigents|legacy" \
-  && fail "allowlisted file has a non-compat omnigent reference" || true
+# Sanity: the allowlisted compat files must contain ONLY legacy compat refs.
+NONCOMPAT="$(git grep -I -in "omnigent" -- substrate/_env_compat.py substrate/cli.py \
+  | grep -viE "OMNIGENT_|OMNIGENTS_|OMNIAGENTS_|\.omnigent|\.omnigents|legacy" || true)"
+if [ -n "$NONCOMPAT" ]; then
+  printf '%s\n' "$NONCOMPAT" >&2
+  fail "allowlisted file has a non-compat omnigent reference"
+fi
 
 # --------------------------------------------------------------------------- #
 # 5. Stage publishable tree
