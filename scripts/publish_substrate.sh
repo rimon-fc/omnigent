@@ -111,8 +111,13 @@ STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 log "staging rebranded tree -> $STAGE (version $VERSION)"
 
-# Copy every tracked file (post-rebrand) into the stage, preserving paths.
-git ls-files -z | rsync -a --files-from=- --from0 ./ "$STAGE/"
+# Export every tracked file (post-rebrand, from the index) into the stage.
+# `git add -A` above put all rebrand changes in the index; archiving the index
+# tree preserves renames, symlinks (verbatim, even if dangling) and modes, and
+# includes ONLY tracked content -- safer than rsync'ing the working dir.
+git add -A
+STAGE_TREE="$(git write-tree)"
+git archive --format=tar "$STAGE_TREE" | tar -x -C "$STAGE"
 
 # Apply exclusions.
 if [ -f "$EXCLUDE_FILE" ]; then
