@@ -1,0 +1,64 @@
+# Publishes the downstream distribution from this repo.
+# Runs in the fork only. Keeps the downstream repo in step with this tree.
+name: publish-substrate
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Stage and commit locally but do not push"
+        type: boolean
+        default: false
+  schedule:
+    # Weekly, Mondays 03:17 UTC (off-peak, avoids the top-of-hour stampede).
+    - cron: "17 3 * * 1"
+
+concurrency:
+  group: publish-substrate
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Sync from source
+        env:
+          UPSTREAM_URL: https://github.com/omnigent-ai/omnigent.git
+          UPSTREAM_REF: main
+        run: |
+          chmod +x scripts/sync_upstream.sh
+          ./scripts/sync_upstream.sh
+
+      - name: Build and publish
+        env:
+          SUBSTRATE_DEPLOY_TOKEN: ${{ secrets.SUBSTRATE_DEPLOY_TOKEN }}
+          DOWNSTREAM_REPO: rimon-fc/substrate
+          DOWNSTREAM_REF: main
+          BOT_NAME: substrate-bot
+          BOT_EMAIL: substrate-bot@users.noreply.github.com
+          DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+        run: |
+          chmod +x scripts/publish_substrate.sh
+          ./scripts/publish_substrate.sh
+
+      - name: Upload build report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-report
+          path: /tmp/rebrand_report.txt
+          if-no-files-found: ignore
+          retention-days: 14

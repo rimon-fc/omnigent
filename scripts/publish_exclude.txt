@@ -1,0 +1,24 @@
+# publish_exclude.txt
+#
+# Paths removed from the rebranded tree BEFORE publishing to the downstream
+# `rimon-fc/substrate` repo. These are the rebrand/publish machinery that must
+# never appear downstream, so the published repo looks hand-crafted.
+#
+# Format: one path per line, relative to repo root. Lines starting with `#`
+# and blank lines are ignored. A trailing `/` means "directory, recursive".
+# Matching is exact-path (after rebrand renames are applied).
+#
+# NOTE: legitimate upstream project workflows (ci.yml, lint.yml, e2e.yml, ...)
+# are intentionally NOT listed here; they belong in a real project and are
+# kept. Only the machinery added for the fork->downstream pipeline is stripped.
+
+# --- rebrand tooling ---
+scripts/rebrand.py
+
+# --- fork->downstream pipeline scripts ---
+scripts/sync_upstream.sh
+scripts/publish_substrate.sh
+scripts/publish_exclude.txt
+
+# --- the workflow that drives the pipeline (neutral name, fork-only) ---
+.github/workflows/publish-substrate.yml
