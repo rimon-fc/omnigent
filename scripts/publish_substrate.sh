@@ -149,6 +149,13 @@ if [ -n "${DOWNSTREAM_URL:-}" ]; then
 elif [ -n "${SUBSTRATE_DEPLOY_TOKEN:-}" ]; then
   PUSH_URL="https://x-access-token:${SUBSTRATE_DEPLOY_TOKEN}@github.com/${DOWNSTREAM_REPO}.git"
 else
+  # No credentials. A dry run can still succeed (the staged tree is built and
+  # validated above); only a real push strictly needs the token.
+  if [ "${DRY_RUN:-0}" = "1" ]; then
+    log "DRY_RUN=1 and no DOWNSTREAM_URL/SUBSTRATE_DEPLOY_TOKEN -> staged tree validated; skipping downstream clone/diff/push."
+    log "staged tree is in: $STAGE"
+    exit 0
+  fi
   fail "no DOWNSTREAM_URL or SUBSTRATE_DEPLOY_TOKEN set for push"
 fi
 
