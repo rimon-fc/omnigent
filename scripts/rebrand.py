@@ -334,6 +334,30 @@ def rename_files(repo: Path, renamed: list[tuple[str, str]]) -> None:
                 renamed.append((f, new))
 
 
+def rebrand_symlinks(repo: Path, changed: list[str]) -> None:
+    """Rewrite symlink TARGETS that contain the brand token.
+
+    A symlink's target is not file content (``rewrite_contents`` reads through
+    the link, and would skip ``.svg`` links anyway), and renaming a link's
+    target file leaves the link text stale -- producing a dangling link. This
+    pass reads each tracked symlink's target with ``os.readlink`` and, if it
+    carries the token, re-points the link via ``rebrand_text``. Idempotent.
+    """
+    for f in tracked_files(repo):
+        if f in SKIP_RELPATHS:
+            continue
+        p = repo / f
+        if not p.is_symlink():
+            continue
+        target = os.readlink(p)
+        new_target = rebrand_text(target)
+        if new_target != target:
+            p.unlink()
+            os.symlink(new_target, p)
+            _run(["git", "add", f], repo)
+            changed.append(f)
+
+
 def rewrite_contents(repo: Path, changed: list[str]) -> None:
     for f in tracked_files(repo):
         if f in SKIP_RELPATHS:
@@ -445,6 +469,7 @@ def main() -> None:
     rename_files(repo, renamed)
 
     changed: list[str] = []
+    rebrand_symlinks(repo, changed)
     rewrite_contents(repo, changed)
     fix_env_compat(repo, changed)
     cli_fixed = fix_cli_legacy_dirs(repo, changed)
