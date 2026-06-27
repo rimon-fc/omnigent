@@ -105,6 +105,20 @@ SPECIAL_CONTENT_BASENAMES = {"_env_compat.py"}
 # its own strings would otherwise be matched by the special-case fixups).
 SELF_RELPATH = "scripts/rebrand.py"
 
+# The fork->downstream pipeline tooling. Like ``rebrand.py`` itself, these files
+# contain the literal token ``omnigent`` (in comments, upstream URLs, and leak-
+# check patterns) on purpose; rebranding them would corrupt the tooling (e.g.
+# turn a ``grep omnigent`` leak check into ``grep substrate``). They are also
+# stripped before publishing (see scripts/publish_exclude.txt), so they never
+# reach the downstream tree. Skipped from every rebrand pass.
+SKIP_RELPATHS = {
+    SELF_RELPATH,
+    "scripts/sync_upstream.sh",
+    "scripts/publish_substrate.sh",
+    "scripts/publish_exclude.txt",
+    ".github/workflows/publish-substrate.yml",
+}
+
 RASTER_IMAGE_EXTS = {
     ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".icns", ".bmp",
     ".tif", ".tiff",
@@ -290,7 +304,7 @@ def rename_directories(repo: Path, renamed: list[tuple[str, str]]) -> None:
     while True:
         target = None
         for f in tracked_files(repo):
-            if f == SELF_RELPATH:
+            if f in SKIP_RELPATHS:
                 continue
             parts = f.split("/")
             for i in range(len(parts) - 1):  # directory components only
@@ -310,7 +324,7 @@ def rename_directories(repo: Path, renamed: list[tuple[str, str]]) -> None:
 def rename_files(repo: Path, renamed: list[tuple[str, str]]) -> None:
     """Rename token-bearing file basenames (directories already handled)."""
     for f in tracked_files(repo):
-        if f == SELF_RELPATH:
+        if f in SKIP_RELPATHS:
             continue
         head, _, base = f.rpartition("/")
         if has_token(base):
@@ -322,7 +336,7 @@ def rename_files(repo: Path, renamed: list[tuple[str, str]]) -> None:
 
 def rewrite_contents(repo: Path, changed: list[str]) -> None:
     for f in tracked_files(repo):
-        if f == SELF_RELPATH:
+        if f in SKIP_RELPATHS:
             continue
         base = f.rsplit("/", 1)[-1]
         if base in SPECIAL_CONTENT_BASENAMES:
@@ -342,7 +356,7 @@ def rewrite_contents(repo: Path, changed: list[str]) -> None:
 
 def fix_env_compat(repo: Path, changed: list[str]) -> str | None:
     for f in tracked_files(repo):
-        if f == SELF_RELPATH:
+        if f in SKIP_RELPATHS:
             continue
         if f.rsplit("/", 1)[-1] == "_env_compat.py":
             p = repo / f
@@ -357,7 +371,7 @@ def fix_env_compat(repo: Path, changed: list[str]) -> str | None:
 def fix_cli_legacy_dirs(repo: Path, changed: list[str]) -> list[str]:
     fixed = []
     for f in tracked_files(repo):
-        if f == SELF_RELPATH or not f.endswith(".py"):
+        if f in SKIP_RELPATHS or not f.endswith(".py"):
             continue
         p = repo / f
         try:
@@ -383,7 +397,7 @@ def build_unchanged_report(repo: Path, brand_assets: set[str]):
     compat, art, residual = [], [], []
     bare = re.compile(r"omnigent", re.IGNORECASE)
     for f in tracked_files(repo):
-        if f == SELF_RELPATH:
+        if f in SKIP_RELPATHS:
             continue
         base = f.rsplit("/", 1)[-1]
         ext = os.path.splitext(f)[1].lower()
