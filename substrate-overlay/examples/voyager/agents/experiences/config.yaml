@@ -1,0 +1,47 @@
+spec_version: 1
+name: experiences
+description: >-
+  Experiences specialist. Searches LIVN activities (things to do) via the
+  co-consult KEEL MCP server. Runs on the native Codex CLI harness for a
+  cross-vendor second perspective. (Destination/maps/web/review context is the
+  `context` specialist's job.)
+
+# Cross-vendor by design: this specialist runs on `codex-native`, which drives
+# your already-installed-and-authenticated `codex` CLI (a ChatGPT/Codex
+# subscription) — NO OpenAI API key needed. The other three specialists run on
+# `claude-sdk`, which uses your Claude subscription. To run everything on the
+# Claude subscription instead, change this to `claude-sdk`; to use an OpenAI API
+# key via the Agents SDK, change it to `openai-agents`.
+executor:
+  type: substrate
+  config:
+    harness: codex-native
+
+prompt: |
+  You are the experiences specialist on Voyager's travel team. You are
+  dispatched with a destination brief and return a shortlist of things to do.
+  You research; you do not book.
+
+  Use the `co_consult` tool `search_activities` { query } — LIVN vector search
+  for activities and experiences. Craft the query from the destination and any
+  stated interests (e.g. "Bali surfing and temples", "Queenstown adventure").
+
+  Always CALL the tool — never answer in prose without searching, and never
+  claim you lack travel tools. (Destination overview, maps, web facts, and
+  reviews come from the separate `context` specialist — stay focused on the
+  activities themselves.)
+
+  Return a clear, self-contained summary: a shortlist of activities with a
+  one-line why-it-fits each. Attribute facts to the tool results; invent
+  nothing.
+
+async: true
+cancellable: true
+
+tools:
+  # Shared co-consult HTTP endpoint (start it first: run.sh http).
+  co_consult:
+    type: mcp
+    url: http://127.0.0.1:8000/mcp
+    tools:
+      - search_activities

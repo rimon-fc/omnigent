@@ -119,6 +119,19 @@ SKIP_RELPATHS = {
     ".github/workflows/publish-substrate.yml",
 }
 
+# Directory prefixes skipped entirely. ``substrate-overlay/`` holds the curated
+# README, art, and example set in their FINAL form; they must not be rebranded
+# (they are already correct) and are layered onto the published tree by
+# publish_substrate.sh, never shipped from here.
+SKIP_PREFIXES = (
+    "substrate-overlay/",
+)
+
+
+def _skip(relpath: str) -> bool:
+    """True if a tracked path is rebrand-exempt tooling/overlay."""
+    return relpath in SKIP_RELPATHS or relpath.startswith(SKIP_PREFIXES)
+
 RASTER_IMAGE_EXTS = {
     ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".icns", ".bmp",
     ".tif", ".tiff",
@@ -304,7 +317,7 @@ def rename_directories(repo: Path, renamed: list[tuple[str, str]]) -> None:
     while True:
         target = None
         for f in tracked_files(repo):
-            if f in SKIP_RELPATHS:
+            if _skip(f):
                 continue
             parts = f.split("/")
             for i in range(len(parts) - 1):  # directory components only
@@ -324,7 +337,7 @@ def rename_directories(repo: Path, renamed: list[tuple[str, str]]) -> None:
 def rename_files(repo: Path, renamed: list[tuple[str, str]]) -> None:
     """Rename token-bearing file basenames (directories already handled)."""
     for f in tracked_files(repo):
-        if f in SKIP_RELPATHS:
+        if _skip(f):
             continue
         head, _, base = f.rpartition("/")
         if has_token(base):
@@ -344,7 +357,7 @@ def rebrand_symlinks(repo: Path, changed: list[str]) -> None:
     carries the token, re-points the link via ``rebrand_text``. Idempotent.
     """
     for f in tracked_files(repo):
-        if f in SKIP_RELPATHS:
+        if _skip(f):
             continue
         p = repo / f
         if not p.is_symlink():
@@ -360,7 +373,7 @@ def rebrand_symlinks(repo: Path, changed: list[str]) -> None:
 
 def rewrite_contents(repo: Path, changed: list[str]) -> None:
     for f in tracked_files(repo):
-        if f in SKIP_RELPATHS:
+        if _skip(f):
             continue
         base = f.rsplit("/", 1)[-1]
         if base in SPECIAL_CONTENT_BASENAMES:
@@ -380,7 +393,7 @@ def rewrite_contents(repo: Path, changed: list[str]) -> None:
 
 def fix_env_compat(repo: Path, changed: list[str]) -> str | None:
     for f in tracked_files(repo):
-        if f in SKIP_RELPATHS:
+        if _skip(f):
             continue
         if f.rsplit("/", 1)[-1] == "_env_compat.py":
             p = repo / f
@@ -395,7 +408,7 @@ def fix_env_compat(repo: Path, changed: list[str]) -> str | None:
 def fix_cli_legacy_dirs(repo: Path, changed: list[str]) -> list[str]:
     fixed = []
     for f in tracked_files(repo):
-        if f in SKIP_RELPATHS or not f.endswith(".py"):
+        if _skip(f) or not f.endswith(".py"):
             continue
         p = repo / f
         try:
@@ -421,7 +434,7 @@ def build_unchanged_report(repo: Path, brand_assets: set[str]):
     compat, art, residual = [], [], []
     bare = re.compile(r"omnigent", re.IGNORECASE)
     for f in tracked_files(repo):
-        if f in SKIP_RELPATHS:
+        if _skip(f):
             continue
         base = f.rsplit("/", 1)[-1]
         ext = os.path.splitext(f)[1].lower()

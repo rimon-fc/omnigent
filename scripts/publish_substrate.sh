@@ -37,6 +37,9 @@ DOWNSTREAM_REF="${DOWNSTREAM_REF:-main}"
 BOT_NAME="${BOT_NAME:-substrate-bot}"
 BOT_EMAIL="${BOT_EMAIL:-substrate-bot@users.noreply.github.com}"
 EXCLUDE_FILE="scripts/publish_exclude.txt"
+OVERLAY_DIR="substrate-overlay"          # source-of-truth overrides (fork-only)
+OVERLAY_FILES="${OVERLAY_DIR}/files"     # layered onto the staged tree root
+OVERLAY_EXAMPLES="${OVERLAY_DIR}/examples" # replaces the published examples/ dir
 
 log()  { printf '[publish] %s\n' "$*"; }
 fail() { printf '[publish] ERROR: %s\n' "$*" >&2; exit 1; }
@@ -131,6 +134,58 @@ if [ -f "$EXCLUDE_FILE" ]; then
     esac
   done < "$EXCLUDE_FILE"
 fi
+
+# --------------------------------------------------------------------------- #
+# 5b. Apply the Substrate overlay (source-of-truth overrides).
+# --------------------------------------------------------------------------- #
+# The rebrand is purely mechanical (text + path renames). Three things it
+# cannot derive from upstream because the information is not in upstream:
+#   * the curated README,
+#   * genuine Substrate art (the upstream logo is Omnigent letterforms drawn as
+#     vector paths -- no script can repaint geometry into a new word),
+#   * the example set (we ship our own, not upstream's debby/polly/scribe).
+# These live in the fork under substrate-overlay/ and are layered on here, so
+# every publish reproduces them automatically.
+
+# (i) Replace examples/ wholesale with our curated example(s).
+if [ -d "$OVERLAY_EXAMPLES" ]; then
+  rm -rf "${STAGE:?}/examples"
+  mkdir -p "${STAGE}/examples"
+  cp -R "$OVERLAY_EXAMPLES"/. "${STAGE}/examples/"
+  log "overlay: examples/ replaced with $(cd "$OVERLAY_EXAMPLES" && ls -d */ 2>/dev/null | tr -d / | tr '\n' ' ')"
+fi
+
+# (ii) Layer file overrides (README, art, ...) onto the staged tree root.
+if [ -d "$OVERLAY_FILES" ]; then
+  cp -R "$OVERLAY_FILES"/. "${STAGE}/"
+  log "overlay: file overrides applied from ${OVERLAY_FILES}"
+fi
+
+# (iii) Map the canonical Substrate art onto the ap-web logo paths so the app
+# no longer ships the Omnigent wordmark. Source: docs/images/substrate-logo.svg
+# (square mark) + the generated wordmark. Targets are the renamed-but-still-
+# Omnigent SVGs under ap-web. Each copy is guarded so a path that does not exist
+# in the current upstream layout is simply skipped.
+ART_SQUARE="${STAGE}/docs/images/substrate-logo.svg"
+ART_WORDMARK="${OVERLAY_FILES}/docs/images/substrate-wordmark.svg"
+map_art() {  # $1 = source, $2 = dest (relative to STAGE)
+  local src="$1" dst="${STAGE}/$2"
+  [ -f "$src" ] || return 0
+  [ -e "$dst" ] || return 0
+  # If the destination is a symlink, replace the link target's file instead.
+  if [ -L "$dst" ]; then
+    local real; real="$(cd "$(dirname "$dst")" && readlink "$dst")"
+    dst="$(cd "$(dirname "$dst")" && cd "$(dirname "$real")" && pwd)/$(basename "$real")"
+    [ -e "$dst" ] || return 0
+  fi
+  cp "$src" "$dst"
+  log "overlay art: $(basename "$src") -> ${2}"
+}
+# Wordmark (1734x454) -> the ap-web platform + iOS logo files.
+map_art "$ART_WORDMARK" "ap-web/platform-assets/logos/substrates-logo.svg"
+map_art "$ART_WORDMARK" "ap-web/ios/Substrate/Assets.xcassets/SubstrateLogo.imageset/substrates-logo.svg"
+# Square mark -> favicon + reverse/otto where present.
+map_art "$ART_SQUARE" "ap-web/public/favicon.svg"
 
 # Post-exclusion leak re-check directly on the staged tree (defence in depth).
 if grep -rIl -e omnigent -e substrate-ai "$STAGE" \

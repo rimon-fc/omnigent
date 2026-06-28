@@ -22,3 +22,8 @@ scripts/publish_exclude.txt
 
 # --- the workflow that drives the pipeline (neutral name, fork-only) ---
 .github/workflows/publish-substrate.yml
+
+# --- the overlay source-of-truth (README/art/examples live here in the fork,
+#     and are layered onto the published tree; the overlay dir itself never
+#     ships downstream) ---
+substrate-overlay/
