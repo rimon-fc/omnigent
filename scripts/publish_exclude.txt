@@ -23,6 +23,7 @@ scripts/publish_exclude.txt
 
 # --- ALL workflows + CI helper scripts: the published repo runs no CI ---
 .github/workflows/
+.github/dependabot.yml
 
 # --- the overlay source-of-truth (README/art/examples live here in the fork,
 #     and are layered onto the published tree; the overlay dir itself never
