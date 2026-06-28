@@ -8,9 +8,10 @@
 # and blank lines are ignored. A trailing `/` means "directory, recursive".
 # Matching is exact-path (after rebrand renames are applied).
 #
-# NOTE: legitimate upstream project workflows (ci.yml, lint.yml, e2e.yml, ...)
-# are intentionally NOT listed here; they belong in a real project and are
-# kept. Only the machinery added for the fork->downstream pipeline is stripped.
+# NOTE: the entire .github/workflows/ tree is stripped (see below). The
+# published snapshot ships no CI: it is a generated mirror, not a repo that
+# runs upstream's tests/release/security jobs (which only fail or fire need-
+# lessly downstream and break the hand-crafted illusion).
 
 # --- rebrand tooling ---
 scripts/rebrand.py
@@ -20,8 +21,8 @@ scripts/sync_upstream.sh
 scripts/publish_substrate.sh
 scripts/publish_exclude.txt
 
-# --- the workflow that drives the pipeline (neutral name, fork-only) ---
-.github/workflows/publish-substrate.yml
+# --- ALL workflows + CI helper scripts: the published repo runs no CI ---
+.github/workflows/
 
 # --- the overlay source-of-truth (README/art/examples live here in the fork,
 #     and are layered onto the published tree; the overlay dir itself never
