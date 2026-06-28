@@ -49,11 +49,10 @@ substrate codex                    # Codex
 substrate run path/to/agent.yaml   # your own agent
 ```
 
-Two example agents ship with the repo:
+An example agent ships with the repo:
 
 ```bash
-substrate run examples/polly/      # multi-agent coding orchestrator
-substrate run examples/debby/      # two-headed (Claude + GPT) brainstorming partner
+substrate run examples/voyager/    # multi-agent travel concierge
 ```
 
 Prefer the browser? Run the local server and register your machine as a host:
