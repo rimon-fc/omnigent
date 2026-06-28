@@ -44,11 +44,53 @@ if [ "$BEFORE" = "$UPSTREAM_SHA" ] || git merge-base --is-ancestor "$UPSTREAM_SH
   exit 0
 fi
 
-# Merge upstream. Abort + fail on conflict.
+# Merge upstream. Abort + fail on genuine content conflicts.
+#
+# The fork intentionally DELETES the inherited upstream CI (everything under
+# .github/workflows/ except publish-substrate.yml, plus .github/dependabot.yml)
+# so those jobs never run on the fork. Upstream still ships and edits those
+# files, which produces "deleted by us / modified by them" merge conflicts on
+# every sync. Those are EXPECTED and resolved in favour of the fork (stay
+# deleted); only OTHER conflicts are real and must halt the publish.
 if ! git merge --no-edit "upstream/${UPSTREAM_REF}"; then
-  log "merge conflict detected; aborting (no publish)."
-  git merge --abort || true
-  exit 2
+  # Resolve the expected CI deletions: anything under .github/workflows (bar
+  # publish-substrate.yml) or .github/dependabot.yml -> keep removed.
+  while IFS= read -r path; do
+    case "$path" in
+      .github/workflows/publish-substrate.yml) : ;;  # keep ours (already present)
+      .github/workflows/*|.github/dependabot.yml)
+        git rm -f --quiet --ignore-unmatch "$path" >/dev/null 2>&1 || true
+        ;;
+    esac
+  done < <(git diff --name-only --diff-filter=U)
+
+  # Any remaining unmerged paths are genuine conflicts -> abort + fail.
+  if [ -n "$(git diff --name-only --diff-filter=U)" ]; then
+    log "genuine merge conflict detected; aborting (no publish):"
+    git diff --name-only --diff-filter=U | sed 's/^/  /' >&2
+    git merge --abort || true
+    exit 2
+  fi
+
+  # Re-assert the full CI removal (covers files upstream re-added cleanly), then
+  # complete the merge commit.
+  find .github/workflows -type f ! -name 'publish-substrate.yml' -delete 2>/dev/null || true
+  rm -f .github/dependabot.yml 2>/dev/null || true
+  git add -A .github >/dev/null 2>&1 || true
+  git commit --no-edit >/dev/null 2>&1 || true
+  log "merge: resolved expected CI deletions in favour of fork."
+fi
+
+# Belt-and-braces: even on a clean merge, upstream may have cleanly re-added a
+# workflow we deleted. Re-assert removal so the fork's main never regains CI.
+find .github/workflows -type f ! -name 'publish-substrate.yml' -delete 2>/dev/null || true
+rm -f .github/dependabot.yml 2>/dev/null || true
+if [ -n "$(git status --porcelain .github 2>/dev/null)" ]; then
+  git add -A .github
+  git -c user.name="${BOT_NAME:-substrate-bot}" \
+      -c user.email="${BOT_EMAIL:-substrate-bot@users.noreply.github.com}" \
+      commit -q -m "chore: prune inherited CI"
+  log "re-pruned inherited CI re-added by upstream."
 fi
 
 AFTER="$(git rev-parse HEAD)"
