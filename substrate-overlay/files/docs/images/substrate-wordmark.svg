@@ -1,1 +1,11 @@
-²ø0‰Ûa
+<svg width="1734" height="454" viewBox="0 0 1734 454" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Substrate">
+  <title>Substrate</title>
+  <desc>Substrate wordmark</desc>
+  <rect width="1734" height="454" fill="none"/>
+  <g>
+    <rect x="70" y="150" width="240" height="44" rx="10" fill="#2C3E8C"/>
+    <rect x="100" y="210" width="240" height="44" rx="10" fill="#3A52B8" opacity="0.85"/>
+    <rect x="130" y="270" width="240" height="44" rx="10" fill="#4B68E0" opacity="0.7"/>
+  </g>
+  <text x="430" y="290" font-family="Charter, Georgia, 'Times New Roman', serif" font-size="200" font-weight="700" letter-spacing="-4" fill="#1B2440">Substrate</text>
+</svg>
