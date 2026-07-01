@@ -24,6 +24,13 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
   exit 1
 }
 
+# Ensure a committer identity exists. `git merge` records a merge commit and
+# fails hard ("empty ident name not allowed") on a bare CI runner that has no
+# user.name/user.email configured. Set a default ONLY if the caller has not
+# already configured one, so a real identity (e.g. the publish bot) still wins.
+git config user.email >/dev/null 2>&1 || git config user.email "${BOT_EMAIL:-substrate-bot@users.noreply.github.com}"
+git config user.name  >/dev/null 2>&1 || git config user.name  "${BOT_NAME:-substrate-bot}"
+
 # Add or update the upstream remote.
 if git remote get-url upstream >/dev/null 2>&1; then
   git remote set-url upstream "$UPSTREAM_URL"
@@ -53,6 +60,19 @@ fi
 # every sync. Those are EXPECTED and resolved in favour of the fork (stay
 # deleted); only OTHER conflicts are real and must halt the publish.
 if ! git merge --no-edit "upstream/${UPSTREAM_REF}"; then
+  # A non-zero merge can mean two very different things:
+  #   (a) the EXPECTED CI-deletion conflicts (unmerged paths recorded), or
+  #   (b) a genuine merge failure with NO recorded conflicts (e.g. empty
+  #       committer ident, index lock, aborted merge). Case (b) used to fall
+  #       through here and "succeed" while HEAD stayed un-merged, silently
+  #       publishing a stale tree. Distinguish them: if there are no unmerged
+  #       paths, the merge itself failed -> abort + fail loudly.
+  if [ -z "$(git diff --name-only --diff-filter=U)" ]; then
+    log "merge failed with no recorded conflicts (not a CI-deletion conflict); aborting."
+    git merge --abort 2>/dev/null || true
+    exit 3
+  fi
+
   # Resolve the expected CI deletions: anything under .github/workflows (bar
   # publish-substrate.yml) or .github/dependabot.yml -> keep removed.
   while IFS= read -r path; do
